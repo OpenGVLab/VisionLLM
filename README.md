@@ -9,7 +9,7 @@ Large language models (LLMs) have notably accelerated progress towards artificia
 
 [**NOTE**] VisionLLM will be integrated into [InternGPT](https://github.com/OpenGVLab/InternGPT).
 
-**InternGPT** is online (see [https://igpt.opengvlab.com](https://igpt.opengvlab.com/)). Let's try it!
+**[InternGPT](https://github.com/OpenGVLab/InternGPT)** is online (see [https://igpt.opengvlab.com](https://igpt.opengvlab.com/)). Let's try it!
 
 
 ## 🗓️ Schedule
