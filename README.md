@@ -1,4 +1,4 @@
-# VisionLLM [[Paper]()] 
+# VisionLLM [[Paper](https://arxiv.org/abs/2305.11175)] 
 
 
 <!-- ## Description -->
@@ -34,7 +34,7 @@ If you find this project useful in your research, please consider cite:
 @misc{2023visionllm,
     title={VisionLLM: Large Language Model is also an Open-Ended Decoder for Vision-Centric Tasks},
     author={Wenhai Wang and Zhe Chen and Xiaokang Chen and Jiannan Wu and Xizhou Zhu and Gang Zeng and Ping Luo and Tong Lu and Jie Zhou and Yu Qiao and Jifeng Dai},
-    howpublished = {\url{todo}},
+    howpublished = {\url{https://arxiv.org/abs/2305.11175)},
     year={2023}
 }
 ```
