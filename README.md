@@ -20,7 +20,7 @@ Large language models (LLMs) have notably accelerated progress towards artificia
 <img width="800" alt="image" src="https://github.com/OpenGVLab/VisionLLM/assets/23737120/8fb174ed-4df7-490d-85be-4ebb524fc4c6">
 
 ## 🎁 Major Features 
-<img width="800" alt="image" src="https://github.com/OpenGVLab/VisionLLM/assets/23737120/94a23c43-3919-40f1-88ea-a270e4796979">
+<img width="800" alt="image" src="https://github.com/OpenGVLab/VisionLLM/assets/23737120/e825d53e-e282-4d6a-a1b3-7efb0dfa3613">
 
 ## 🎫 License
 
