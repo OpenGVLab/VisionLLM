@@ -1,0 +1,27 @@
+{
+    "architectures": [
+      "StableDiffusionWithLLMEmbConfig"
+    ],
+    "model_type": "stable_diffusion_with_llm_emb",
+    "llm_hidden_size": 4096,
+    "sd_hidden_size": 768,
+    "num_queries": 77,
+    "num_encoder_layers": 4,
+    "num_decoder_layers": 4,
+    "sd_model_id": "checkpoints/stable-diffusion-v1-5",
+    "trigger_token": "[GEN]",
+    "embed_tokens": {
+      "emb": "[EMB]",
+      "emb2": "[EMB2]",
+      "emb3": "[EMB3]",
+      "emb4": "[EMB4]",
+      "emb5": "[EMB5]",
+      "emb6": "[EMB6]",
+      "emb7": "[EMB7]",
+      "emb8": "[EMB8]"
+    },
+    "num_embed_tokens": 64,
+    "cfg_drop_rate": 0.1,
+    "cfg_scale": 7.5
+  }
+  
