@@ -3,7 +3,7 @@
 </div>
 
 - [VisionLLM](https://arxiv.org/abs/2305.11175): Large Language Model as Open-Ended Decoder for Vision-Centric Tasks
-- [VisionLLMv2](): A Generalist Multimodal Large Language Model for Hundeds of Vision-Language Tasks
+- [VisionLLM v2](https://arxiv.org/abs/2406.08394): A Generalist Multimodal Large Language Model for Hundeds of Vision-Language Tasks
 
 <br>
 

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![arXiv](https://img.shields.io/badge/arXiv%20paper-2406.xxxx-b31b1b.svg)](https://arxiv.org/abs/2406.xxx)&nbsp;
+[![arXiv](https://img.shields.io/badge/arXiv%20paper-2406.08394-b31b1b.svg)](https://arxiv.org/abs/2406.08394)&nbsp;
 [![project page](https://img.shields.io/badge/Project_page-VisionLLMv2-green)](https://wjn922.github.io/visionllmv2.github.io/)&nbsp;
 
 </div>
@@ -67,9 +67,8 @@ If you find this project useful in your research, please consider cite:
 
 @article{wu2024visionllmv2,
   title={VisionLLM v2: An End-to-End Generalist Multimodal Large Language Model for Hundreds of Vision-Language Tasks},
-  author={Jiannan, Wu and Muyan, Zhong and Sen, Xing and Zeqiang, Lai and Zhaoyang, Liu and Wenhai, Wang and Zhe, Chen and Xizhou, Zhu and
-  Lewei, Lu and Tong, Lu and Ping, Luo and Yu, Qiao and Jifeng, Dai},
-  journal={arXiv preprint arXiv:xxx},
+  author={Jiannan, Wu and Muyan, Zhong and Sen, Xing and Zeqiang, Lai and Zhaoyang, Liu and Zhe, Chen and Wenhai, Wang and Xizhou, Zhu and Lewei, Lu and Tong, Lu and Ping, Luo and Yu, Qiao and Jifeng, Dai},
+  journal={arXiv preprint arXiv:2406.08394},
   year={2024}
 }
 
