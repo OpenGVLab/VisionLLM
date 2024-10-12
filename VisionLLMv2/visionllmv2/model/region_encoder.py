@@ -89,7 +89,7 @@ class RegionEncoder(nn.Module):
             self.region_query = nn.Embedding(1, embed_dim)
             self.region_attn = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=8, dropout=0., batch_first=True)
         elif self.mask_pool_type == 'grid_sample':
-            self.num_points = 12544  # 112 x 112
+            self.num_points = 2304  # 48 x 48
         self.up_dim = nn.Linear(embed_dim, out_dim)
 
     def forward(self, images, masks, image_features):

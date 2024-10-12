@@ -26,8 +26,8 @@ class StableDiffusionWithLLMEmbConfig(PretrainedConfig):
         llm_hidden_size=4096,
         sd_hidden_size=768,
         num_queries=77,
-        num_encoder_layers=4,
-        num_decoder_layers=4,
+        num_encoder_layers=1,
+        num_decoder_layers=1,
         sd_model_id="runwayml/stable-diffusion-v1-5",
         trigger_token="[GEN]",
         trigger_token_id=None,
@@ -101,7 +101,7 @@ class StableDiffusionWithLLMEmb(StableDiffusionWithLLMEmbPreTrainedModel):
         # Freeze vae and text_encoder
         self.sd_vae.requires_grad_(False)
         self.sd_text_encoder.requires_grad_(False)
-        # self.sd_unet.requires_grad_(False)
+        self.sd_unet.requires_grad_(False)
 
         self.post_init()
 
@@ -124,7 +124,7 @@ class StableDiffusionWithLLMEmb(StableDiffusionWithLLMEmbPreTrainedModel):
         t2i_input_embedding = [] # list[tensor], tensor of [num_embs_gen, c]
         for i in range(len(special_token_index)):
             bs_id, seq_id = special_token_index[i]
-            t2i_input_embedding.append(last_hidden_state[bs_id: bs_id + 1, seq_id + 1: seq_id + 1 +self.config.num_embed_tokens, :]) 
+            t2i_input_embedding.append(last_hidden_state[bs_id: bs_id + 1, seq_id + 1: seq_id + 1 + self.config.num_embed_tokens, :]) 
         t2i_input_embedding = torch.cat(t2i_input_embedding, dim=0) # [bs, num_embs_gen, c]
 
         img_token_bs = t2i_input_embedding.shape[0]
@@ -214,9 +214,9 @@ class StableDiffusionWithLLMEmb(StableDiffusionWithLLMEmbPreTrainedModel):
     @torch.no_grad()
     def run(self, input_ids, hidden_states, **kwargs):
         # hidden_states = concat_cache_hidden_states(outputs["hidden_states"])
-        mapping_feature = self.extract_features(input_ids, hidden_states)
+        mapping_feature = self.extract_features(input_ids, hidden_states)  # [1, 77, c]
         sd_pipeline = self.sd_pipeline.to(mapping_feature.device, dtype=mapping_feature.dtype)
-        predicted_image = sd_pipeline(prompt_embeds=mapping_feature, **kwargs).images[0]
+        predicted_image = sd_pipeline(prompt_embeds=mapping_feature, **kwargs).images
         return predicted_image
 
 

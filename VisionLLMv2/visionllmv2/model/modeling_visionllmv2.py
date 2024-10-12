@@ -12,6 +12,7 @@ import torch.nn.functional as F
 import torch.distributed as dist
 from torch.nn import CrossEntropyLoss
 from typing import List, Optional, Tuple, Union, Dict, Any
+import itertools
 
 from transformers.utils import logging, ModelOutput
 from transformers import LlamaModel, LlamaForCausalLM
@@ -162,6 +163,13 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
         v_hidden_size = self.v_hidden_size * 4 if self.use_pixelshuffle else self.v_hidden_size
         if vl_bridge_type == "linear":
             self.vl_bridge = nn.Linear(v_hidden_size, self.l_hidden_size)
+        elif vl_bridge_type == 'internvl_mlp' or vl_bridge_type == 'internvl':
+            self.vl_bridge = nn.Sequential(
+                nn.LayerNorm(v_hidden_size),
+                nn.Linear(v_hidden_size, self.l_hidden_size),
+                nn.GELU(),
+                nn.Linear(self.l_hidden_size, self.l_hidden_size)
+            )
         else:
             mlp_gelu_match = re.match(r'^mlp(\d+)x_gelu*', vl_bridge_type)
             if mlp_gelu_match:
@@ -289,7 +297,10 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
             self.region_encoder.requires_grad_(False)
 
     def freeze_emb_embeddings(self):
-        self.emb_embeddings.requires_grad_(False)
+        self.emb_embeddings_det.requires_grad_(False)
+        self.emb_embeddings_pose.requires_grad_(False)
+        self.emb_embeddings_gen.requires_grad_(False)
+        self.emb_embeddings_edit.requires_grad_(False)
 
     def get_vis_encoder(self):
         return getattr(self, 'vis_encoder', None)
@@ -388,6 +399,7 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
             attention_mask: Optional[torch.Tensor] = None,
             images: Optional[list] = None,   # 'pad': [bs, 3, h, w], 'anyres': list[tensor], bs x [1 + n_split, 3, h, w]
             regions: Optional[list] = None,  # this is for region referring or visual prompt location. List[tensor], bs x [n_region, h, w], 0-1 mask.
+            num_splits: Optional[List] = None,  # list[list[int]]: bs x n_image x [n_split], used when using mmic data
             # ----------------------------------
             images_aug: Optional[list] = None,
             targets: Optional[list] = None,
@@ -412,6 +424,12 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
         # NOTE: special operation for the [emb] tokens, this works well for both train and generation (use_cache=True)
         # replace emb embeddings with predefined self.emb_embeddings, 
         # and concat emb ids after special tool ids
+        if self.det_tool_id in input_ids[0] or self.seg_tool_id in input_ids[0] or self.grd_tool_id in input_ids[0] or \
+            self.pose_tool_id in input_ids[0] or self.gen_tool_id in input_ids[0] or self.edit_tool_id in input_ids[0]:
+            if self.emb_token_id not in input_ids[0]:  # for generation, generate tokens 1 by 1
+                gap_len, gap_len_gen = 0, 0
+            else:   # for training, we have added the [EMB] tokens in the input_ids
+                gap_len, gap_len_gen = self.num_embs, self.num_embs_gen
         emb_ids = torch.tensor([x for x in range(self.emb_token_id, self.emb_token_id + self.num_embs)], dtype=torch.long).to(input_ids.device)
         emb_embeddings_det = self.emb_embeddings_det.weight.unsqueeze(0).repeat(inputs_embeds.shape[0], 1, 1)    # [bs, num_embeds, c]
         emb_embeddings_pose = self.emb_embeddings_pose.weight.unsqueeze(0).repeat(inputs_embeds.shape[0], 1, 1)  # [bs, num_embeds, c]
@@ -438,7 +456,7 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                     [
                         cur_new_input_ids[: _start_pos + 1],
                         emb_ids,
-                        cur_new_input_ids[_start_pos + self.num_embs + 1 :]
+                        cur_new_input_ids[_start_pos + gap_len + 1 :]
                     ], dim=0
                 )
                 # repalce with emb embeddings
@@ -446,7 +464,7 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                     [
                         cur_new_input_embeds[: _start_pos + 1],
                         cur_emb_embeddings_det,
-                        cur_new_input_embeds[_start_pos + self.num_embs + 1 :]
+                        cur_new_input_embeds[_start_pos + gap_len + 1 :]
                     ], dim=0
                 ).contiguous()  # replace with self.emb_embeddings
             # using unipose
@@ -456,7 +474,7 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                     [
                         cur_new_input_ids[: _start_pos + 1],
                         emb_ids,
-                        cur_new_input_ids[_start_pos + self.num_embs + 1 :]
+                        cur_new_input_ids[_start_pos + gap_len + 1 :]
                     ], dim=0
                 )
                 # repalce with emb embeddings
@@ -464,7 +482,7 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                     [
                         cur_new_input_embeds[: _start_pos + 1],
                         cur_emb_embeddings_pose,
-                        cur_new_input_embeds[_start_pos + self.num_embs + 1 :]
+                        cur_new_input_embeds[_start_pos + gap_len + 1 :]
                     ], dim=0
                 ).contiguous()  # replace with self.emb_embeddings
             # using sd
@@ -474,7 +492,7 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                     [
                         cur_new_input_ids[: _start_pos + 1],
                         emb_ids_gen,
-                        cur_new_input_ids[_start_pos + self.num_embs_gen + 1 :]
+                        cur_new_input_ids[_start_pos + gap_len_gen + 1 :]
                     ], dim=0
                 )
                 # repalce with emb embeddings
@@ -482,7 +500,7 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                     [
                         cur_new_input_embeds[: _start_pos + 1],
                         cur_emb_embeddings_gen,
-                        cur_new_input_embeds[_start_pos + self.num_embs_gen + 1 :]
+                        cur_new_input_embeds[_start_pos + gap_len_gen + 1 :]
                     ], dim=0
                 ).contiguous()  # replace with self.emb_embeddings
             # using ip2p
@@ -492,7 +510,7 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                     [
                         cur_new_input_ids[: _start_pos + 1],
                         emb_ids_gen,
-                        cur_new_input_ids[_start_pos + self.num_embs_gen + 1 :]
+                        cur_new_input_ids[_start_pos + gap_len_gen + 1 :]
                     ], dim=0
                 )
                 # repalce with emb embeddings
@@ -500,7 +518,7 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                     [
                         cur_new_input_embeds[: _start_pos + 1],
                         cur_emb_embeddings_edit,
-                        cur_new_input_embeds[_start_pos + self.num_embs_gen + 1 :]
+                        cur_new_input_embeds[_start_pos + gap_len_gen + 1 :]
                     ], dim=0
                 ).contiguous()  # replace with self.emb_embeddings
             # assert cur_new_input_embeds.shape[0] == cur_input_embeds.shape[0]
@@ -518,12 +536,24 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                 attention_mask = torch.cat(
                     [attention_mask, attention_mask.new_ones((attention_mask.shape[0], add_length))], dim=-1
                 )
-        if input_ids.shape[1] != attention_mask.shape[1]:   # generation
-            # having [emb] in this generation step
-            if input_ids.shape[1] != 1:
+        else:  # useful for multi-round chat
+            total_length = input_ids.shape[1]
+            if attention_mask.shape[1] != total_length: 
+                add_length = total_length - attention_mask.shape[1]
                 attention_mask = torch.cat(
-                    [attention_mask, attention_mask.new_ones((attention_mask.shape[0], self.num_embs))], dim=-1
+                    [attention_mask, attention_mask.new_ones((attention_mask.shape[0], add_length))], dim=-1
                 )
+        if past_key_values is not None:
+            # having [emb] in this generation step
+            if input_ids.shape[1] != 1:  
+                if self.gen_tool_id in input_ids or self.edit_tool_id in input_ids:  # visual generation
+                    attention_mask = torch.cat(
+                        [attention_mask, attention_mask.new_ones((attention_mask.shape[0], self.num_embs_gen))], dim=-1
+                    )
+                else:  # visual perception
+                    attention_mask = torch.cat(
+                        [attention_mask, attention_mask.new_ones((attention_mask.shape[0], self.num_embs))], dim=-1
+                    )
         # ------------------------------------------------------------
 
         # for the 1st step generation
@@ -557,11 +587,22 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
             if type(images) == list:
                 has_image = [has_image[i][None].repeat(split_sizes[i]) for i in range(B)]
                 has_image = torch.cat(has_image, dim=0)
-            selected = selected.reshape(-1)                          
-            temp_embeds = torch.zeros_like(inputs_embeds)             
-            temp_embeds[selected] = image_features[has_image].reshape(-1, C)   
-            selected = selected.to(inputs_embeds.dtype).unsqueeze(-1) 
-            inputs_embeds = inputs_embeds * (1 - selected) + temp_embeds * selected
+            selected = selected.reshape(-1)                           # [B*L]
+            # handle interleaved data when num(<images>) != num(images)
+            try:
+                vit_embeds = image_features[has_image].reshape(-1, C)
+                inputs_embeds[selected] = inputs_embeds[selected] * 0.0 + vit_embeds
+                ignore_flag = False
+            except Exception as e:
+                vit_embeds = image_features[has_image].reshape(-1, C) 
+                print(f'warning: {e}, inputs_embeds[selected].shape={inputs_embeds[selected].shape}, '
+                  f'vit_embeds.shape={vit_embeds.shape}')
+                n_selected_token = selected.sum()
+                n_vit_token = vit_embeds.shape[0]
+                vit_embeds = vit_embeds.repeat(n_selected_token // n_vit_token, 1) if n_selected_token > n_vit_token \
+                                else vit_embeds[:n_vit_token]
+                inputs_embeds[selected] = inputs_embeds[selected] * 0.0  + vit_embeds
+                ignore_flag = True
             inputs_embeds = inputs_embeds.reshape(B, L, C)
 
             # deal with region/non-region data joint train with zero2/3
@@ -575,28 +616,67 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                     if num_beams > 1:
                         num_regions = num_regions * num_beams
                         all_regions = all_regions.repeat(num_beams, 1, 1, 1)
-                    if type(images) == list:  # 'anyres', last split is the global image 
-                        all_images = [images[i][-1][None].repeat_interleave(num_regions[i], dim=0) for i in range(len(images))]
-                    else:  # 'pad'
-                        all_images = [images[i][None].repeat_interleave(num_regions[i], dim=0) for i in range(len(images))]  # list[tensor], bs x [n_region, 3, h, w]
-                    all_images = torch.cat(all_images, dim=0)   
+                    #########################################################
+                    # all_images
+                    # repeat image and image_features, [bs, 3, h, w], [bs, 1024, c]
+                    if num_splits is not None:  # mmic-data
+                        all_images = []
+                        for i, (images_per_batch, num_splits_per_batch) in enumerate(zip(images, num_splits)):
+                            # image_per_batch: [n_images_and_splits, 3, h, w]
+                            # num_splits_per_batch: list[int]
+                            cumu_num_splits_per_batch = list(itertools.accumulate(num_splits_per_batch))
+                            cumu_num_splits_per_batch = [x-1 for x in cumu_num_splits_per_batch] # start from 0
+                            cumu_num_splits_per_batch = torch.as_tensor(cumu_num_splits_per_batch, dtype=torch.long, device=input_ids.device)
+                            images_per_batch = images_per_batch[cumu_num_splits_per_batch]  # [n_images, 3, h, w]
+                            images_per_batch = images_per_batch[:num_regions[i]]  # [n_region, 3, h, w], mmic-data, len(images)==len(regions) in a sample
+                            all_images.append(images_per_batch)
+                    else:
+                        if type(images) == list:  # 'anyres', last split is the global image
+                                all_images = [images[i][-1][None].repeat_interleave(num_regions[i], dim=0) for i in range(len(images))]
+                        else:  # 'pad'
+                            all_images = [images[i][None].repeat_interleave(num_regions[i], dim=0) for i in range(len(images))]  # list[tensor], bs x [n_region, 3, h, w]
+                    all_images = torch.cat(all_images, dim=0)    # [n_all_regions, 3, h, w]
+                    #########################################################
+                    # all_image_features
                     # multi-scale of last 3 levels image features for region encoder
                     mlvl_image_features = image_forward_outs.hidden_states[-3:] 
-                    if type(images) == list:  # 'anyres', last split is global image
-                        new_mlvl_image_features = []
+                    if num_splits is not None:  # mmic-data
+                        all_image_features = []
+                        # for each level
+                        for image_features_per_level in mlvl_image_features:  # [n_all_image_and_splits, 1 + img_len, 1024]
+                            image_features_per_level = torch.split(image_features_per_level, split_sizes, dim=0)  # bs x [n_image_and_splits, 1 + img_len, 1024]
+                            # for each batch
+                            all_image_features_per_level = []
+                            for i, (image_features_per_level_per_batch, num_splits_per_batch) in enumerate(zip(image_features_per_level, num_splits)):
+                                # image_features_per_level_per_batch: [n_image_and_splits, 1 + img_len, 1024]
+                                # num_splits_per_batch: list[int]
+                                cumu_num_splits_per_batch = list(itertools.accumulate(num_splits_per_batch))
+                                cumu_num_splits_per_batch = [x-1 for x in cumu_num_splits_per_batch] # start from 0
+                                cumu_num_splits_per_batch = torch.as_tensor(cumu_num_splits_per_batch, dtype=torch.long, device=input_ids.device)
+                                image_features_per_level_per_batch = image_features_per_level_per_batch[cumu_num_splits_per_batch, 1:] # [n_images, img_len, 1024]
+                                image_features_per_level_per_batch = image_features_per_level_per_batch[:num_regions[i]] # [n_region, img_len, 1024], mmic-data, len(images)==len(regions)
+                                all_image_features_per_level.append(image_features_per_level_per_batch)
+                            all_image_features_per_level = torch.cat(all_image_features_per_level, dim=0)  # [n_all_regions, img_len, 1024]
+                            all_image_features.append(all_image_features_per_level)
+                    else:
+                        if type(images) == list:  # 'anyres', last split is global image
+                            new_mlvl_image_features = []
+                            for image_features_per_level in mlvl_image_features:  # [n_all_image_splits, 1 + img_len, 1024]
+                                image_features_per_level = torch.split(image_features_per_level, split_sizes, dim=0)  # bs x [n_image_splits, 1 + img_len, 1024]
+                                image_features_per_level = [x[-1, 1:] for x in image_features_per_level]  
+                                image_features_per_level = torch.stack(image_features_per_level, dim=0)  # [bs, img_len, 1024]
+                                new_mlvl_image_features.append(image_features_per_level)  
+                            mlvl_image_features = new_mlvl_image_features  # list[tensor], 3 x [bs, img_len, 1024]
+                            del new_mlvl_image_features
+                        else: # 'pad'
+                            mlvl_image_features = [mlvl_image_feature[:, 1:] for mlvl_image_feature in mlvl_image_features]  # list[tensor], 3 x [bs, img_len, 1024]
+                        all_image_features = []                      
                         for image_features_per_level in mlvl_image_features:
-                            image_features_per_level = torch.split(image_features_per_level, split_sizes, dim=0)  
-                            image_features_per_level = [x[-1, 1:] for x in image_features_per_level]  
-                            image_features_per_level = torch.stack(image_features_per_level, dim=0)  
-                            new_mlvl_image_features.append(image_features_per_level)
-                        mlvl_image_features = new_mlvl_image_features
-                    else: # 'pad'
-                        mlvl_image_features = [mlvl_image_feature[:, 1:] for mlvl_image_feature in mlvl_image_features] 
-                    all_image_features = []                      
-                    for image_features_per_level in mlvl_image_features:
-                        all_image_features_per_level = [image_features_per_level[i][None].repeat_interleave(num_regions[i], dim=0) for i in range(len(images))]
-                        all_image_features_per_level = torch.cat(all_image_features_per_level)
-                        all_image_features.append(all_image_features_per_level) 
+                            # [bs, img_len, 1024]
+                            all_image_features_per_level = [image_features_per_level[i][None].repeat_interleave(num_regions[i], dim=0) for i in range(len(images))]
+                            all_image_features_per_level = torch.cat(all_image_features_per_level)
+                            all_image_features.append(all_image_features_per_level)  # 3 x [n_all_regions, img_len, 1024]
+                    #########################################################
                     # all_images:  [n_all_regions, 3, h, w]
                     # all_regions: [n_all_regions, 1, h, w]
                     # all_image_features: 3 x [n_all_regions, img_len, 1024]
@@ -669,6 +749,8 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
             # Enable model/pipeline parallelism
             shift_labels = shift_labels.to(shift_logits.device)
             loss = loss_fct(shift_logits, shift_labels)
+            if ignore_flag:
+                loss = loss * 0.0
             
 
         # ---------------------- atom tools ------------------------------
@@ -680,7 +762,7 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
         # det/grd/seg
         # gdino
         if self.use_gdino:
-            if task in ['det', 'det_cap', 'grd', 'seg', 'count_text', 'count_visual', 'interactive'] and images_aug is not None:
+            if task in ['det', 'det_cap', 'grd', 'seg', 'count_text', 'count_visual', 'interactive', 'ic_mask'] and images_aug is not None:
                 images_aug = nested_tensor_from_tensor_list(images_aug, size_divisibility=32)
                 pixel_values, pixel_mask = images_aug.tensors, ~images_aug.mask 
                 pixel_mask = pixel_values[:, 0, :, :] != 0  # valid is 1

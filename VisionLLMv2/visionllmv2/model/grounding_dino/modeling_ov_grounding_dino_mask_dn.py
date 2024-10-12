@@ -3404,6 +3404,7 @@ class GroundingDinoLoss(nn.Module):
             losses['loss_dice'] = src_masks.sum() * 0.0
             return losses
 
+        torch.cuda.empty_cache()
         assert "pred_masks" in outputs
         src_idx = self._get_source_permutation_idx(indices)
         tgt_idx = self._get_target_permutation_idx(indices)

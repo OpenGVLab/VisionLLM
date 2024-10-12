@@ -6,8 +6,8 @@
     "llm_hidden_size": 4096,
     "sd_hidden_size": 768,
     "num_queries": 77,
-    "num_encoder_layers": 4,
-    "num_decoder_layers": 4,
+    "num_encoder_layers": 1,
+    "num_decoder_layers": 1,
     "sd_model_id": "checkpoints/instruct-pix2pix",
     "trigger_token": "[EDIT]",
     "embed_tokens": {

@@ -26,8 +26,8 @@ class InstructPix2PixWithLLMEmbConfig(PretrainedConfig):
         llm_hidden_size=4096,
         sd_hidden_size=768,
         num_queries=77,
-        num_encoder_layers=4,
-        num_decoder_layers=4,
+        num_encoder_layers=1,
+        num_decoder_layers=1,
         sd_model_id="timbrooks/instruct-pix2pix",
         trigger_token="[EDIT]",
         trigger_token_id=None,
@@ -101,7 +101,7 @@ class InstructPix2PixWithLLMEmb(InstructPix2PixWithLLMEmbPreTrainedModel):
         # Freeze vae and text_encoder
         self.sd_vae.requires_grad_(False)
         self.sd_text_encoder.requires_grad_(False)
-        self.sd_unet.requires_grad_(False)
+        # self.sd_unet.requires_grad_(False)
 
         self.post_init()
 
@@ -210,7 +210,7 @@ class InstructPix2PixWithLLMEmb(InstructPix2PixWithLLMEmbPreTrainedModel):
     def extract_features(self, input_ids, hidden_states):
         special_token_index = (input_ids == self.config.trigger_token_id).nonzero()
         # special_token_index = (input_ids == 32003).nonzero()
-        last_hidden_state = hidden_states[-1]
+        last_hidden_state = hidden_states # [bs, l, c]
 
         t2i_input_embedding = []
         for i in range(len(special_token_index)):
@@ -227,7 +227,7 @@ class InstructPix2PixWithLLMEmb(InstructPix2PixWithLLMEmbPreTrainedModel):
     def run(self, input_ids, hidden_states, **kwargs):
         mapping_feature = self.extract_features(input_ids, hidden_states)
         sd_pipeline = self.sd_pipeline.to(mapping_feature.device, dtype=mapping_feature.dtype)
-        predicted_image = sd_pipeline(prompt_embeds=mapping_feature, **kwargs).images[0]
+        predicted_image = sd_pipeline(prompt_embeds=mapping_feature, **kwargs).images
         return predicted_image
 
 
