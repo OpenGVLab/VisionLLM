@@ -9,6 +9,10 @@ from transformers import LlamaConfig, CLIPVisionConfig
 from transformers.configuration_utils import PretrainedConfig
 from transformers.utils import logging
 
+# vision / llm
+from .internvit.configuration_intern_vit import InternVisionConfig
+from .internlm2.configuration_internlm2 import InternLM2Config
+
 # atom tools
 from .grounding_dino.configuration_grounding_dino import GroundingDinoConfig
 from .unipose.configuration_unipose import UniPoseConfig
@@ -55,8 +59,14 @@ class VisionLLMv2Config(PretrainedConfig):
             llm_config = {}
             logger.info("llm_config is None. Initializing the LlamaConfig with default values.")
         
-        self.vis_encoder_config = CLIPVisionConfig(**vis_encoder_config)
-        self.llm_config = LlamaConfig(**llm_config)
+        if vis_encoder_config['architectures'] == ['InternVisionModel']:
+            self.vis_encoder_config = InternVisionConfig(**vis_encoder_config)
+        else:
+            self.vis_encoder_config = CLIPVisionConfig(**vis_encoder_config)
+        if llm_config['architectures'] == ['InternLM2ForCausalLM']:
+            self.llm_config = InternLM2Config(**llm_config)
+        else:
+            self.llm_config = LlamaConfig(**llm_config)
 
         self.pretrained_vl_bridge = pretrained_vl_bridge
         self.use_llm_lora = use_llm_lora
