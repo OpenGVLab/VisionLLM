@@ -8,28 +8,18 @@ from torch.utils.data import ConcatDataset
 from visionllmv2.datasets.llava_data import LazySupervisedDataset
 # det
 from visionllmv2.datasets.coco_llava import CocoLlavaDataset
-from visionllmv2.datasets.lvis_llava import LvisLlavaDataset
 from visionllmv2.datasets.crowdhuman_llava import CrowdhumanLlavaDataset
 from visionllmv2.datasets.det_llava import DetLlavaDataset
 from visionllmv2.datasets.odinw_llava import OdinwLlavaDataset
 from visionllmv2.datasets.cod_llava import CODLlavaDataset  
 from visionllmv2.datasets.sod_llava import SODLlavaDataset
-from visionllmv2.datasets.dota_llava import DOTALlavaDataset
-from visionllmv2.datasets.sar_llava import SARLlavaDataset
-from visionllmv2.datasets.deeppcb_llava import DeepPCBLlavaDataset
-from visionllmv2.datasets.neu_llava import NEULlavaDataset
 # det cap (referential dialogue)
-from visionllmv2.datasets.flickr30k_llava import Flickr30kLlavaDataset
 from visionllmv2.datasets.groma_llava import GromaLlavaDataset
 # grd
 from visionllmv2.datasets.refcoco_llava import RefCocoLlavaDataset
 from visionllmv2.datasets.reasonseg_llava import ReasonsegLlavaDataset
-# seg
+# sem seg
 from visionllmv2.datasets.ade20k_llava import ADE20KLlavaDataset
-from visionllmv2.datasets.cityscape_llava import CityscapesLlavaDataset
-from visionllmv2.datasets.mapillary_llava import MapillaryLlavaDataset
-from visionllmv2.datasets.loveda_llava import LovedaLlavaDataset
-from visionllmv2.datasets.medical_mr_llava import MedicalMrDataset
 # pose
 from visionllmv2.datasets.coco_pose_llava import CocoPoseLlavaDataset
 from visionllmv2.datasets.crowdpose_llava import CrowdposeLlavaDataset
@@ -37,11 +27,8 @@ from visionllmv2.datasets.unikpt_llava import UniKPTLlavaDataset
 # region caption
 from visionllmv2.datasets.vg import VisualGenome
 from visionllmv2.datasets.refcoco import RefCOCO
-from visionllmv2.datasets.flickr30k import Flickr30k
 from visionllmv2.datasets.vcr import VCRDataset
 from visionllmv2.datasets.vcr_vqa import VCRVQA
-from visionllmv2.datasets.as_caption import ASCaption
-from visionllmv2.datasets.as_vqa import ASVQA
 from visionllmv2.datasets.osprey import OspreyConversations, OspreyDetailedDescription, \
     OspreyLVISPosNeg, OspreyPartLevel, OspreyShortForm
 # region recognition
@@ -49,10 +36,6 @@ from visionllmv2.datasets.v3det import V3DetRecognition, CocoRecognition
 from visionllmv2.datasets.lvis import LVISRecognition
 # visual prompt
 from visionllmv2.datasets.coco_interactive import CocoInteractiveDataset, CocoInteractiveTest
-from visionllmv2.datasets.sa_interactive import SAInteractiveDataset
-# count
-from visionllmv2.datasets.count_object_text_llava import CountObjectTextLlavaDataset
-from visionllmv2.datasets.count_object_visual_llava import CountObjectVisualLlavaDataset
 # image gen/edit
 from visionllmv2.datasets.text2img import CC3MDataset, LaionDataset, MJDataset, JourneyDBDataset
 from visionllmv2.datasets.ip2p import IP2PDataset, SeedXDataset
@@ -86,12 +69,6 @@ def build_dataset(dataset_cfg, tokenizer, data_args, **kwargs):
             tokenizer=tokenizer,
             data_args=data_args
         )
-    elif dataset_type == 'lvis_llava':
-        dataset = LvisLlavaDataset(
-            **dataset_cfg,
-            tokenizer=tokenizer,
-            data_args=data_args
-        )
     elif dataset_type == 'crowdhuman_llava':
         dataset = CrowdhumanLlavaDataset(
             **dataset_cfg,
@@ -111,12 +88,6 @@ def build_dataset(dataset_cfg, tokenizer, data_args, **kwargs):
             data_args=data_args
         )
     # det cap
-    elif dataset_type == 'flickr30k_llava':
-        dataset = Flickr30kLlavaDataset(
-            **dataset_cfg,
-            tokenizer=tokenizer,
-            data_args=data_args
-        )
     elif dataset_type == 'groma_llava':
         dataset = GromaLlavaDataset(
             **dataset_cfg,
@@ -148,57 +119,9 @@ def build_dataset(dataset_cfg, tokenizer, data_args, **kwargs):
             tokenizer=tokenizer,
             data_args=data_args
         )
-    elif dataset_type == 'dota_llava':
-        dataset = DOTALlavaDataset(
-            **dataset_cfg,
-            tokenizer=tokenizer,
-            data_args=data_args
-        )
-    elif dataset_type == 'sar_llava':
-        dataset = SARLlavaDataset(
-            **dataset_cfg,
-            tokenizer=tokenizer,
-            data_args=data_args
-        )
-    elif dataset_type == "neu_llava":
-        dataset = NEULlavaDataset(
-            **dataset_cfg, 
-            tokenizer=tokenizer, 
-            data_args=data_args
-        )
-    elif dataset_type == "deeppcb_llava":
-        dataset = DeepPCBLlavaDataset(
-            **dataset_cfg, 
-            tokenizer=tokenizer, 
-            data_args=data_args
-        )
     # semseg
     elif dataset_type == 'ade20k_llava':
         dataset = ADE20KLlavaDataset(
-            **dataset_cfg,
-            tokenizer=tokenizer,
-            data_args=data_args
-        )
-    elif dataset_type == 'cityscape_llava':
-        dataset = CityscapesLlavaDataset(
-            **dataset_cfg,
-            tokenizer=tokenizer,
-            data_args=data_args
-        )
-    elif dataset_type == 'mapillary_llava':
-        dataset = MapillaryLlavaDataset(
-            **dataset_cfg,
-            tokenizer=tokenizer,
-            data_args=data_args
-        )
-    elif dataset_type == 'loveda_llava':
-        dataset = LovedaLlavaDataset(
-            **dataset_cfg,
-            tokenizer=tokenizer,
-            data_args=data_args
-        )
-    elif dataset_type == 'medical_mr_llava':
-        dataset = MedicalMrDataset(
             **dataset_cfg,
             tokenizer=tokenizer,
             data_args=data_args
@@ -231,12 +154,6 @@ def build_dataset(dataset_cfg, tokenizer, data_args, **kwargs):
         )
     elif dataset_type == 'refcoco':
         dataset = RefCOCO(
-            **dataset_cfg,
-            tokenizer=tokenizer,
-            data_args=data_args
-        )
-    elif dataset_type == 'flickr30k':
-        dataset = Flickr30k(
             **dataset_cfg,
             tokenizer=tokenizer,
             data_args=data_args
@@ -327,25 +244,6 @@ def build_dataset(dataset_cfg, tokenizer, data_args, **kwargs):
             tokenizer=tokenizer,
             data_args=data_args
         ) 
-    elif dataset_type == 'sa_interactive':
-        dataset = SAInteractiveDataset(
-            **dataset_cfg,
-            tokenizer=tokenizer,
-            data_args=data_args
-        )
-    # count
-    elif dataset_type == 'count_object_text':
-        dataset = CountObjectTextLlavaDataset(
-            **dataset_cfg,
-            tokenizer=tokenizer,
-            data_args=data_args
-        )
-    elif dataset_type == 'count_object_visual':
-        dataset = CountObjectVisualLlavaDataset(
-            **dataset_cfg,
-            tokenizer=tokenizer,
-            data_args=data_args
-        )
     # image generation
     elif dataset_type == 'cc3m':
         dataset = CC3MDataset(

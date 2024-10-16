@@ -98,7 +98,6 @@ from ..eval.eval_det import eval_det
 from ..eval.eval_semseg import eval_semseg
 from ..eval.eval_pose import eval_pose
 from ..eval.eval_sod import eval_sod
-from ..eval.eval_count import eval_count
 from ..eval.eval_visual_prompt import eval_visual_prompt
 
 
@@ -419,8 +418,6 @@ def train(eval_only=False):
         print("Loading OVGroundingDino...")
         gdino_config = GroundingDinoConfig.from_pretrained(model_args.gdino_path)
         gdino_config.auxiliary_loss = True       # default is False
-        # gdino_config.class_cost = 2              # default is 1
-        # gdino_config.class_loss_coefficient = 1  # follow mmdet
         # matching cost
         gdino_config.class_cost = 2.0        
         gdino_config.dice_cost = 5.0
@@ -606,15 +603,6 @@ def train(eval_only=False):
                     elif dataset_name == 'odinw':
                         num_classes, topk = eval_dataset.num_classes, 100
                         eval_det(model, eval_dataloader, num_classes=num_classes, topk=topk, with_mask=eval_dataset.with_mask)
-                    elif dataset_name == 'dota':
-                        num_classes, topk = 18, 500
-                        eval_det(model, eval_dataloader, num_classes=num_classes, topk=topk, with_mask=eval_dataset.with_mask)
-                    elif dataset_name == 'sar':
-                        num_classes, topk = 6, 100
-                        eval_det(model, eval_dataloader, num_classes=num_classes, topk=topk, with_mask=eval_dataset.with_mask)
-                    elif dataset_name == 'deeppcb':
-                        num_classes, topk = 6, 100
-                        eval_det(model, eval_dataloader, num_classes=num_classes, topk=topk, with_mask=eval_dataset.with_mask)
                     elif dataset_name in ['sod', 'cod']:
                         num_classes, topk = 1, 1
                         # sod
@@ -658,17 +646,6 @@ def train(eval_only=False):
                         sem_seg_postprocess_before_inference = True
                     eval_semseg(model, eval_dataloader, num_classes=num_classes, topk=topk, \
                                 sem_seg_postprocess_before_inference=sem_seg_postprocess_before_inference)
-                # count
-                elif task == 'count_text':
-                    num_classes, topk = eval_dataset.num_classes, 900
-                    eval_count(model, eval_dataloader, num_classes=num_classes, topk=topk, with_mask=eval_dataset.with_mask,
-                               ann_file=eval_dataset.ann_file, eval_results_save_dir=training_args.output_dir, task=task)
-                elif task == 'count_visual':
-                    # only has 1 visual prompt for each image in eval datasets ['ca44', 'fsc-147', 'fscd-lvis']
-                    num_classes, topk = 1, 900  
-                    ca44_typewise = True if dataset_name == 'ca44' else False
-                    eval_count(model, eval_dataloader, num_classes=num_classes, topk=topk, with_mask=eval_dataset.with_mask,
-                               ann_file=eval_dataset.ann_file, eval_results_save_dir=training_args.output_dir, ca44_typewise=ca44_typewise, task=task)
                 # interactive
                 elif task == 'interactive':
                     num_classes, topk = None, 300  # num_classes will be determined by gt number in each image

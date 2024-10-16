@@ -28,7 +28,6 @@ except ImportError as E:
 
 IMAGE_TOKEN_INDEX = -200
 
-SA_MAP = json.load(open("conversion/sa_path.json"))
 
 
 def pil_loader(img_str):
