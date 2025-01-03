@@ -18,6 +18,7 @@ scikit-image
 scikit-learn
 progressbar2
 pysodmetrics
+pytorch-fid==0.3.0
 transformers==4.34.0
 sentencepiece
 accelerate==0.23.0
@@ -28,4 +29,3 @@ tokenizers==0.14.1
 sentence-transformers==2.7.0
 huggingface_hub==0.17.2
 diffusers==0.28.2
-
