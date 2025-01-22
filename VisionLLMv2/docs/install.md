@@ -3,11 +3,11 @@
 
 ## Environment
 
-- CUDA11.8
-- GCC7.3.0
-- python3.9 / 3.10
-- pytorch2.0.1
-- transformers4.34
+- CUDA 11.8
+- GCC 7.3.0
+- python 3.9 / 3.10
+- pytorch 2.0.1
+- transformers 4.34
 
 
 ## Installation
@@ -37,9 +37,9 @@ conda activate vllmv2
 pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
 ```
 
-Then, please refer to the `install.sh` to install the necessary packages step by step.
+Then, please refer to the [install.sh](https://github.com/OpenGVLab/VisionLLM/blob/release/VisionLLMv2/install.sh) to install the necessary packages step by step.
 
 - Additional:
 
-`pycocoevalcap` is used to evaluate the metrics for image/region caption. You can install it by yourself. 
-For the convenience, you can directly download it from [here](https://drive.google.com/file/d/1_haRVgvnhwMxjGIgwy3xdxgI9G8nWnaF/view?usp=drive_link). Unzip the file and put it under the main folder `VisionLLM/VisionLLMv2`.
+`pycocoevalcap` is used to evaluate the metrics for image/region captioning. You can install it by yourself.    
+Alternatively, you can directly download it from [google drive](https://drive.google.com/file/d/1_haRVgvnhwMxjGIgwy3xdxgI9G8nWnaF/view?usp=drive_link). Unzip the file and put it under the main folder `VisionLLM/VisionLLMv2`.
