@@ -272,8 +272,7 @@ def train(eval_only=False):
     # 1. Parse input arguments
     # if use deepspeed zero3, init_dist before HFArgumentParse
     # uncomment following line if use slurm
-    if not eval_only:
-        init_dist(launcher='slurm', backend='nccl', port=29503)
+    # init_dist(launcher='slurm', backend='nccl', port=29503)
     # See all possible arguments in src/transformers/training_args.py
     parser = HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()    

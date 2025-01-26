@@ -14,7 +14,7 @@ torchrun --nnodes=${NNODES} --nproc_per_node=${GPUS} --master_port=${PORT} \
     --version v1 \
     --dataset_config ${CONFIG} \
     --model_name_or_path ${OUTPUT_DIR} \
-    --vis_encoder_path checkpoints/clip-vit-large-patch14-336 \
+    --vis_encoder_path ${OUTPUT_DIR} \
     --vl_bridge_type mlp2x_gelu \
     --vis_output_layer -2 \
     --use_unipose True \

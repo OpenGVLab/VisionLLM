@@ -16,7 +16,7 @@ torchrun --nnodes=${NNODES} --nproc_per_node=${GPUS} --master_port=${PORT} \
     --image_aspect_ratio anyres \
     --image_size 336 \
     --image_max_tile 4 \
-    --vis_encoder_path checkpoints/clip-vit-large-patch14-336 
+    --vis_encoder_path ${OUTPUT_DIR}
 
 
 # e.g.

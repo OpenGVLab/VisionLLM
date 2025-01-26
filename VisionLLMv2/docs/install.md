@@ -37,9 +37,14 @@ conda activate vllmv2
 pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118
 ```
 
-Then, please refer to the [install.sh](https://github.com/OpenGVLab/VisionLLM/blob/release/VisionLLMv2/install.sh) to install the necessary packages step by step.
+Then, please refer to [install.sh](https://github.com/OpenGVLab/VisionLLM/blob/release/VisionLLMv2/docs/install.md) to install the necessary packages step by step.
 
 - Additional:
 
-`pycocoevalcap` is used to evaluate the metrics for image/region captioning. You can install it by yourself.    
-Alternatively, you can directly download it from [google drive](https://drive.google.com/file/d/1_haRVgvnhwMxjGIgwy3xdxgI9G8nWnaF/view?usp=drive_link). Unzip the file and put it under the main folder `VisionLLM/VisionLLMv2`.
+`pycocoevalcap` is used to evaluate the metrics for image/region captioning. You can install it by yourself. 
+For your convenience, you can directly download it and unzip the file.
+```
+wget https://huggingface.co/OpenGVLab/VisionLLMv2/resolve/main/data/pycocoevalcap.zip
+unzip -qq pycocoevalcap.zip
+rm -rf pycocoevalcap.zip
+```

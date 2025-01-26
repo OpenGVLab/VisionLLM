@@ -13,7 +13,7 @@ PYTHONPATH="$(dirname $0)/../../..":$PYTHONPATH \
     --image_aspect_ratio anyres \
     --image_size 336 \
     --image_max_tile 4 \
-    --vis_encoder_path checkpoints/clip-vit-large-patch14-336
+    --vis_encoder_path ${OUTPUT_DIR}
 
 DIRNAME=`basename ${OUTPUT_DIR}`
 python3 visionllmv2/eval/mme/calculation.py --results_dir ${DIRNAME}
