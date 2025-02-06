@@ -2,8 +2,8 @@
 <h1> VisionLLM Series </h1>
 </div>
 
-- [VisionLLM](https://arxiv.org/abs/2305.11175): Large Language Model as Open-Ended Decoder for Vision-Centric Tasks
-- [VisionLLM v2](https://arxiv.org/abs/2406.08394): A Generalist Multimodal Large Language Model for Hundeds of Vision-Language Tasks
+- [VisionLLM](https://arxiv.org/abs/2305.11175): Large Language Model as Open-Ended Decoder for Vision-Centric Tasks (NIPS2023)
+- [VisionLLM v2](https://arxiv.org/abs/2406.08394): A Generalist Multimodal Large Language Model for Hundeds of Vision-Language Tasks (NIPS2024)
 
 <br>
 
