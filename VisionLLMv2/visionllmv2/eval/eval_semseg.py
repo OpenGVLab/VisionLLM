@@ -88,6 +88,8 @@ def eval_semseg(model, eval_dataloader, num_classes=150, topk=100, sem_seg_postp
             anno_names = [i.replace('images','annotations').replace('.jpg','.png') for i in file_names]
             result = post_process_sem_seg(result, target_size, image_size,num_classes=num_classes, topk=topk,
                                 sem_seg_postprocess_before_inference=sem_seg_postprocess_before_inference)  # [H, W], np.array
+
+            # collect using mmseg
             results.extend(result)
             if rank == 0:
                 batch_size = len(result)
@@ -98,7 +100,6 @@ def eval_semseg(model, eval_dataloader, num_classes=150, topk=100, sem_seg_postp
     results = collect_results_cpu(results, len(dataset), None)
     if rank == 0:
         dataset.evaluate(results, metric='mIoU')
-
 
         
     

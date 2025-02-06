@@ -75,12 +75,12 @@ class VisualGenomeTest(VisualGenome):
         prompt = conv.get_prompt()
 
         # tokenizer conversations
-        input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0).cuda() # [1, L]
+        input_ids = tokenizer_image_token(prompt, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt').unsqueeze(0) # [1, L]
         # replace with 'imp' tokens
         replace_token = DEFAULT_TOKENS['imp'] * image_token_len
         if self.use_im_start_end:
             replace_token = DEFAULT_TOKENS['boi'] + replace_token + DEFAULT_TOKENS['eoi']
-        replace_token_ids = self.tokenizer([replace_token], return_tensors="pt").input_ids[0][1:].cuda() # [L,], remove start token
+        replace_token_ids = self.tokenizer([replace_token], return_tensors="pt").input_ids[0][1:] # [L,], remove start token
         index = input_ids[0].argmin()  # find the index of IMAGE_TOKEN_INDEX
         new_input_ids = torch.cat([input_ids[0, :index], replace_token_ids, input_ids[0, index+1:]], dim=0).unsqueeze(0)
         input_ids = new_input_ids  # [1, L]
@@ -141,7 +141,7 @@ def eval_model(args):
     # FIXME: num_worker > 0 would cause RuntimeError: Cannot re-initialize CUDA in forked subprocess. 
     # To use CUDA with multiprocessing, you must use the 'spawn' start method.
     dataloader = DataLoader(dataset=dataset, sampler=sampler, collate_fn=custom_collate_fn,
-                        batch_size=args.batch_size_per_gpu, num_workers=0)  
+                        batch_size=args.batch_size_per_gpu, num_workers=8, pin_memory=True)  
     
     # stop criterion, this is needed for internlm2
     conv_mode = args.conv_mode

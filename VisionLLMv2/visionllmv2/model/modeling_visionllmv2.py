@@ -12,6 +12,7 @@ import torch.nn.functional as F
 import torch.distributed as dist
 from torch.nn import CrossEntropyLoss
 from typing import List, Optional, Tuple, Union, Dict, Any
+import itertools
 
 from transformers.utils import logging, ModelOutput
 from transformers import LlamaModel, LlamaForCausalLM
@@ -398,6 +399,7 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
             attention_mask: Optional[torch.Tensor] = None,
             images: Optional[list] = None,   # 'pad': [bs, 3, h, w], 'anyres': list[tensor], bs x [1 + n_split, 3, h, w]
             regions: Optional[list] = None,  # this is for region referring or visual prompt location. List[tensor], bs x [n_region, h, w], 0-1 mask.
+            num_splits: Optional[List] = None,  # list[list[int]]: bs x n_image x [n_split], used when using mmic data
             # ----------------------------------
             images_aug: Optional[list] = None,
             targets: Optional[list] = None,
@@ -616,29 +618,69 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                     if num_beams > 1:
                         num_regions = num_regions * num_beams
                         all_regions = all_regions.repeat(num_beams, 1, 1, 1)
+                        
+                    #########################################################
+                    # all_images
                     # repeat image and image_features, [bs, 3, h, w], [bs, 1024, c]
-                    if type(images) == list:  # 'anyres', last split is the global image 
-                        all_images = [images[i][-1][None].repeat_interleave(num_regions[i], dim=0) for i in range(len(images))]
-                    else:  # 'pad'
-                        all_images = [images[i][None].repeat_interleave(num_regions[i], dim=0) for i in range(len(images))]  # list[tensor], bs x [n_region, 3, h, w]
-                    all_images = torch.cat(all_images, dim=0)    
+                    if num_splits is not None:  # mmic-data
+                        all_images = []
+                        for i, (images_per_batch, num_splits_per_batch) in enumerate(zip(images, num_splits)):
+                            # image_per_batch: [n_images_and_splits, 3, h, w]
+                            # num_splits_per_batch: list[int]
+                            cumu_num_splits_per_batch = list(itertools.accumulate(num_splits_per_batch))
+                            cumu_num_splits_per_batch = [x-1 for x in cumu_num_splits_per_batch] # start from 0
+                            cumu_num_splits_per_batch = torch.as_tensor(cumu_num_splits_per_batch, dtype=torch.long, device=input_ids.device)
+                            images_per_batch = images_per_batch[cumu_num_splits_per_batch]  # [n_images, 3, h, w]
+                            images_per_batch = images_per_batch[:num_regions[i]]  # [n_region, 3, h, w], mmic-data, len(images)==len(regions) in a sample
+                            all_images.append(images_per_batch)
+                    else:
+                        if type(images) == list:  # 'anyres', last split is the global image
+                                all_images = [images[i][-1][None].repeat_interleave(num_regions[i], dim=0) for i in range(len(images))]
+                        else:  # 'pad'
+                            all_images = [images[i][None].repeat_interleave(num_regions[i], dim=0) for i in range(len(images))]  # list[tensor], bs x [n_region, 3, h, w]
+                    all_images = torch.cat(all_images, dim=0)    # [n_all_regions, 3, h, w]
+                    #########################################################
+                    # all_image_features
                     # multi-scale of last 3 levels image features for region encoder
                     mlvl_image_features = image_forward_outs.hidden_states[-3:] 
-                    if type(images) == list:  # 'anyres', last split is global image
-                        new_mlvl_image_features = []
-                        for image_features_per_level in mlvl_image_features:  
-                            image_features_per_level = torch.split(image_features_per_level, split_sizes, dim=0)  
-                            image_features_per_level = [x[-1, 1:] for x in image_features_per_level]  
-                            image_features_per_level = torch.stack(image_features_per_level, dim=0) 
-                            new_mlvl_image_features.append(image_features_per_level)
-                        mlvl_image_features = new_mlvl_image_features
-                    else: # 'pad'
-                        mlvl_image_features = [mlvl_image_feature[:, 1:] for mlvl_image_feature in mlvl_image_features]  
-                    all_image_features = []                      
-                    for image_features_per_level in mlvl_image_features:
-                        all_image_features_per_level = [image_features_per_level[i][None].repeat_interleave(num_regions[i], dim=0) for i in range(len(images))]
-                        all_image_features_per_level = torch.cat(all_image_features_per_level)
-                        all_image_features.append(all_image_features_per_level)  # 3 x [n_all_regions, img_len, 1024]
+                    if num_splits is not None:  # mmic-data
+                        all_image_features = []
+                        # for each level
+                        for image_features_per_level in mlvl_image_features:  # [n_all_image_and_splits, 1 + img_len, 1024]
+                            image_features_per_level = torch.split(image_features_per_level, split_sizes, dim=0)  # bs x [n_image_and_splits, 1 + img_len, 1024]
+                            # for each batch
+                            all_image_features_per_level = []
+                            for i, (image_features_per_level_per_batch, num_splits_per_batch) in enumerate(zip(image_features_per_level, num_splits)):
+                                # image_features_per_level_per_batch: [n_image_and_splits, 1 + img_len, 1024]
+                                # num_splits_per_batch: list[int]
+                                cumu_num_splits_per_batch = list(itertools.accumulate(num_splits_per_batch))
+                                cumu_num_splits_per_batch = [x-1 for x in cumu_num_splits_per_batch] # start from 0
+                                cumu_num_splits_per_batch = torch.as_tensor(cumu_num_splits_per_batch, dtype=torch.long, device=input_ids.device)
+                                image_features_per_level_per_batch = image_features_per_level_per_batch[cumu_num_splits_per_batch, 1:] # [n_images, img_len, 1024]
+                                image_features_per_level_per_batch = image_features_per_level_per_batch[:num_regions[i]] # [n_region, img_len, 1024], mmic-data, len(images)==len(regions)
+                                all_image_features_per_level.append(image_features_per_level_per_batch)
+                            all_image_features_per_level = torch.cat(all_image_features_per_level, dim=0)  # [n_all_regions, img_len, 1024]
+                            all_image_features.append(all_image_features_per_level)
+                    else:
+                        if type(images) == list:  # 'anyres', last split is global image
+                            new_mlvl_image_features = []
+                            for image_features_per_level in mlvl_image_features:  # [n_all_image_splits, 1 + img_len, 1024]
+                                image_features_per_level = torch.split(image_features_per_level, split_sizes, dim=0)  # bs x [n_image_splits, 1 + img_len, 1024]
+                                image_features_per_level = [x[-1, 1:] for x in image_features_per_level]  
+                                image_features_per_level = torch.stack(image_features_per_level, dim=0)  # [bs, img_len, 1024]
+                                new_mlvl_image_features.append(image_features_per_level)  
+                            mlvl_image_features = new_mlvl_image_features  # list[tensor], 3 x [bs, img_len, 1024]
+                            del new_mlvl_image_features
+                        else: # 'pad'
+                            mlvl_image_features = [mlvl_image_feature[:, 1:] for mlvl_image_feature in mlvl_image_features]  # list[tensor], 3 x [bs, img_len, 1024]
+                        all_image_features = []                      
+                        for image_features_per_level in mlvl_image_features:
+                            # [bs, img_len, 1024]
+                            all_image_features_per_level = [image_features_per_level[i][None].repeat_interleave(num_regions[i], dim=0) for i in range(len(images))]
+                            all_image_features_per_level = torch.cat(all_image_features_per_level)
+                            all_image_features.append(all_image_features_per_level)  # 3 x [n_all_regions, img_len, 1024]
+                    #########################################################
+                    
                     # all_images:  [n_all_regions, 3, h, w]
                     # all_regions: [n_all_regions, 1, h, w]
                     # all_image_features: 3 x [n_all_regions, img_len, 1024]
@@ -725,7 +767,7 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
         # det/grd/seg
         # gdino
         if self.use_gdino:
-            if task in ['det', 'det_cap', 'grd', 'seg', 'count_text', 'count_visual', 'interactive'] and images_aug is not None:
+            if task in ['det', 'det_cap', 'grd', 'seg', 'count_text', 'count_visual', 'interactive', 'ic_mask'] and images_aug is not None:
                 images_aug = nested_tensor_from_tensor_list(images_aug, size_divisibility=32)
                 pixel_values, pixel_mask = images_aug.tensors, ~images_aug.mask  # [bs, 3, h, w], [bs, h, w]
                 pixel_mask = pixel_values[:, 0, :, :] != 0  # valid is 1

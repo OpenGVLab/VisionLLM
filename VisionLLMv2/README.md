@@ -46,12 +46,31 @@ VisionLLM v2
 
 <img src='assets/vis_gen_edit.png' align="center" width="80%">
 
+## 🚩 Model Zoo
+
+In the following table, we provide the link for VisionLLMv2.
+
+|   Model Name    |                                       Vision Part                                       |                                 Language Part                                  |                           HF Link                           |  size |
+| :-------------: | :-------------------------------------------------------------------------------------: | :----------------------------------------------------------------------------: | :---------------------------------------------------------: | :----: |
+| VisionLLMv2  | [clip-vit-large](https://huggingface.co/openai/clip-vit-large-patch14) |   [vicuna-7b-v1.5](https://huggingface.co/lmsys/vicuna-7b-v1.5)   | [🤗 link](https://huggingface.co/OpenGVLab/VisionLLMv2)  |  7B |
+
+Please follow the [model preparation](docs/model.md) to prepare the model.
+
+
+
+
+
+## 📕 Documents
+
+- **Installation**: [Installation Guide](docs/install.md)
+- **Evaluation Data Preparation**: [Image-Level VQA](docs/data_image-vqa.md) | [Region-Level VQA](docs/data_region-vqa.md) | [Object Detection](docs/data_det.md) | [Pose Estimation](docs/data_pose.md)
+- **Evaluation**: [Image-Level VQA](docs/eval_image-vqa.md) | [Region-Level VQA](docs/eval_region-vqa.md) | [Object Detection](docs/eval_det.md) | [Pose Estimation](docs/eval_pose.md)
 
 ## 🗓️ Schedule 
 
 - [ ] Add Hugging Face Demo
-- [ ] Release Training Code
-- [ ] Release Model Checkpoints
+- [x] Release Training Code
+- [x] Release Model Checkpoints
 - [x] Release Evaluation Code
 - [x] Release Model Code
 

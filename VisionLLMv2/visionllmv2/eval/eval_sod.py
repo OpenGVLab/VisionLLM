@@ -82,6 +82,7 @@ def eval_sod(model, eval_dataloader, num_classes, topk=100, mask_stride=4, save_
     time.sleep(2)  # This line can prevent deadlock problem in some cases.
     for data in eval_dataloader:
         with torch.no_grad():
+            # data.pop('labels')  # TODO: delete LLM labels
             data = dict_to_cuda(data)
             result = model.forward(**data, return_dict=True)
             target_size = [img_meta['ori_shape'] for img_meta in data['img_metas']]
