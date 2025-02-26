@@ -418,11 +418,10 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
         # TODO beautify (init images_pos within forward)
         if inputs_embeds is None:
             inputs_embeds = self.llm.get_input_embeddings()(input_ids)
-            
-
+        
         # ------------------------------------------------------------
         # NOTE: special operation for the [emb] tokens, this works well for both train and generation (use_cache=True)
-        # replace emb embeddings with predefined self.emb_embeddings, 
+        # replace with tool emb_embeddings
         # and concat emb ids after special tool ids
         if self.det_tool_id in input_ids[0] or self.seg_tool_id in input_ids[0] or self.grd_tool_id in input_ids[0] or \
             self.pose_tool_id in input_ids[0] or self.gen_tool_id in input_ids[0] or self.edit_tool_id in input_ids[0]:
@@ -560,16 +559,16 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
         if past_key_values is None:
             with torch.no_grad():
                 if type(images) == list:  # 'anyres'
-                    images = [x.unsqueeze(0) if x.ndim == 3 else x for x in images] 
-                    split_sizes = [image.shape[0] for image in images]              
-                    concat_images = torch.cat([image for image in images], dim=0)   
+                    images = [x.unsqueeze(0) if x.ndim == 3 else x for x in images] # list[tensor], bs x [n_split, 3, h , w]
+                    split_sizes = [image.shape[0] for image in images]              # list[int]
+                    concat_images = torch.cat([image for image in images], dim=0)   # [n_all_image_splits, 3, h, w]
                     image_forward_outs = self.vis_encoder(concat_images, output_hidden_states=True) 
                 else:  # 'pad'
                     # here images: after clip preprocess, [b, 3, h, w]
                     image_forward_outs = self.vis_encoder(images, output_hidden_states=True)  
                 select_hidden_state_layer = getattr(self.config, "vis_output_layer", -2)
                 select_hidden_state = image_forward_outs.hidden_states[select_hidden_state_layer]
-                image_features_ori = select_hidden_state[:, 1:].to(self.llm.dtype)  
+                image_features_ori = select_hidden_state[:, 1:].to(self.llm.dtype)  # [bs, img_len, 1024] or [n_all_image_splits, img_len, 1024]
             
             # pixel shuffle
             if self.use_pixelshuffle:
@@ -577,13 +576,13 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                 image_features_ori = image_features_ori.reshape(image_features_ori.shape[0], h, w, -1)
                 image_features_ori = self.pixel_shuffle(image_features_ori, scale_factor=0.5)
                 image_features_ori = image_features_ori.reshape(image_features_ori.shape[0], -1, image_features_ori.shape[-1])
-            image_features = self.vl_bridge(image_features_ori).to(inputs_embeds.dtype) 
+            image_features = self.vl_bridge(image_features_ori).to(inputs_embeds.dtype)  # [bs, img_len, 4096] or [n_all_image_splits, img_len, 4096]
 
             # replace image patch token for multi-modal/nlp datasets
             B, L, C = inputs_embeds.shape 
             inputs_embeds = inputs_embeds.reshape(B * L, C)
-            selected = input_ids == self.imp_token_id                
-            has_image = selected.sum(-1) != 0                        
+            selected = input_ids == self.imp_token_id             
+            has_image = selected.sum(-1) != 0                   
             if type(images) == list:
                 has_image = [has_image[i][None].repeat(split_sizes[i]) for i in range(B)]
                 has_image = torch.cat(has_image, dim=0)
@@ -605,17 +604,21 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                 ignore_flag = True
             inputs_embeds = inputs_embeds.reshape(B, L, C)
 
+
             # deal with region/non-region data joint train with zero2/3
             if self.use_region_encoder:
                 if regions is not None:   # region data, list[tensor], bs x [n_region, h, w]
+                    # concat regions in the batch dimension
+                    # regions: list[tensor], bs x [n_region, h, w]
                     num_regions = [len(regions_per_batch) for regions_per_batch in regions]      
                     all_regions = [regions_per_batch[:, None] for regions_per_batch in regions] 
-                    all_regions = torch.cat(all_regions, dim=0) 
+                    all_regions = torch.cat(all_regions, dim=0)  
                     # deal with model.generate() when num_beams > 1
                     num_beams = len(images) // len(regions)
                     if num_beams > 1:
                         num_regions = num_regions * num_beams
                         all_regions = all_regions.repeat(num_beams, 1, 1, 1)
+                        
                     #########################################################
                     # all_images
                     # repeat image and image_features, [bs, 3, h, w], [bs, 1024, c]
@@ -677,17 +680,18 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                             all_image_features_per_level = torch.cat(all_image_features_per_level)
                             all_image_features.append(all_image_features_per_level)  # 3 x [n_all_regions, img_len, 1024]
                     #########################################################
+                    
                     # all_images:  [n_all_regions, 3, h, w]
                     # all_regions: [n_all_regions, 1, h, w]
                     # all_image_features: 3 x [n_all_regions, img_len, 1024]
-                    all_region_features = self.region_encoder(all_images, all_regions, all_image_features)  
+                    all_region_features = self.region_encoder(all_images, all_regions, all_image_features) 
                     all_region_features = all_region_features.to(inputs_embeds.dtype)
 
                     # replace <region> token
                     inputs_embeds = inputs_embeds.reshape(B*L, C)
-                    region_mask = input_ids == self.reg_token_id   
-                    region_mask = region_mask.reshape(-1)           
-                    temp_embeds = torch.zeros_like(inputs_embeds)   
+                    region_mask = input_ids == self.reg_token_id    
+                    region_mask = region_mask.reshape(-1)          
+                    temp_embeds = torch.zeros_like(inputs_embeds) 
                     temp_embeds[region_mask] = all_region_features     
                     region_mask = region_mask.to(inputs_embeds.dtype).unsqueeze(-1) 
                     inputs_embeds = inputs_embeds * (1 - region_mask) + temp_embeds * region_mask
@@ -695,16 +699,16 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                 else:  # regions is None
                     if type(images) == list:  # 'anyres'
                         H, W = images[0][0].shape[-2:]
-                        dummy_all_images = torch.zeros((1, 3, H, W), dtype=inputs_embeds.dtype, device=inputs_embeds.device) 
-                        dummy_all_regions = torch.ones((1, 1, H, W), dtype=inputs_embeds.dtype, device=inputs_embeds.device)
-                        dummy_all_image_features = torch.zeros_like(image_forward_outs.hidden_states[-1][:1, 1:])  
-                        dummy_all_image_features = [dummy_all_image_features] * 3  
+                        dummy_all_images = torch.zeros((1, 3, H, W), dtype=inputs_embeds.dtype, device=inputs_embeds.device) # [1, 3, h, w]
+                        dummy_all_regions = torch.ones((1, 1, H, W), dtype=inputs_embeds.dtype, device=inputs_embeds.device) # [1, 1, h, w]
+                        dummy_all_image_features = torch.zeros_like(image_forward_outs.hidden_states[-1][:1, 1:])  # [1, img_len, 1024]
+                        dummy_all_image_features = [dummy_all_image_features] * 3  # multi-scale image features, 3 x [1, img_len, 1024]
                     else:  # 'pad'
                         B, _, H, W = images.shape
-                        dummy_all_images = torch.zeros_like(images)  
-                        dummy_all_regions = torch.ones((B, 1, H, W), dtype=images.dtype, device=images.device)   
-                        dummy_all_image_features = torch.zeros_like(image_forward_outs.hidden_states[-1][:, 1:])  
-                        dummy_all_image_features = [dummy_all_image_features] * 3 
+                        dummy_all_images = torch.zeros_like(images)  # [b, 3, h, w]
+                        dummy_all_regions = torch.ones((B, 1, H, W), dtype=images.dtype, device=images.device)    # [b, 1, h, w]
+                        dummy_all_image_features = torch.zeros_like(image_forward_outs.hidden_states[-1][:, 1:])  # [b, img_len, 1024]
+                        dummy_all_image_features = [dummy_all_image_features] * 3 # multi-scale image features, 3 x [b, img_len, 1024]
                     # dummy forward for region encoder
                     dummy_all_region_features = self.region_encoder(dummy_all_images, dummy_all_regions, dummy_all_image_features)
                     dummy_all_region_features = dummy_all_region_features.to(inputs_embeds.dtype)
@@ -759,22 +763,23 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
         else: 
             task = None
             
+
         # det/grd/seg
         # gdino
         if self.use_gdino:
             if task in ['det', 'det_cap', 'grd', 'seg', 'count_text', 'count_visual', 'interactive', 'ic_mask'] and images_aug is not None:
                 images_aug = nested_tensor_from_tensor_list(images_aug, size_divisibility=32)
-                pixel_values, pixel_mask = images_aug.tensors, ~images_aug.mask 
+                pixel_values, pixel_mask = images_aug.tensors, ~images_aug.mask  # [bs, 3, h, w], [bs, h, w]
                 pixel_mask = pixel_values[:, 0, :, :] != 0  # valid is 1
                 # select the corresponding [EMB] hidden states as text_query
                 batch_size, seq_len, hidden_size = inputs_embeds.shape
-                emb_select = (input_ids >= self.emb_token_id) & (input_ids <= self.emb_token_id + self.num_embs - 1)  
+                emb_select = (input_ids >= self.emb_token_id) & (input_ids <= self.emb_token_id + self.num_embs - 1)  # [bs, seq_len]
                 # if have [EMB] tokens
                 if emb_select.sum() != 0:
                     num_patches = emb_select.sum(-1) // self.num_embs 
                     max_num_patches = num_patches.max()
-                    text_query = torch.zeros((batch_size, max_num_patches, self.num_embs, hidden_size), dtype=hidden_states.dtype, device=hidden_states.device) 
-                    text_query_masks = torch.zeros(batch_size, max_num_patches, dtype=torch.bool, device=hidden_states.device)   
+                    text_query = torch.zeros((batch_size, max_num_patches, self.num_embs, hidden_size), dtype=hidden_states.dtype, device=hidden_states.device)
+                    text_query_masks = torch.zeros(batch_size, max_num_patches, dtype=torch.bool, device=hidden_states.device)     
                     for batch_idx in range(batch_size):
                         if num_patches[batch_idx] != 0:
                             text_query_i = hidden_states[batch_idx, emb_select[batch_idx], :].reshape(-1, self.num_embs, hidden_size) 
@@ -796,7 +801,7 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                 images_aug = nested_tensor_from_tensor_list(images_aug, size_divisibility=32)
                 # select the corresponding [EMB] hidden states as text_query
                 batch_size, seq_len, hidden_size = inputs_embeds.shape
-                emb_select = (input_ids >= self.emb_token_id) & (input_ids <= self.emb_token_id + self.num_embs - 1) 
+                emb_select = (input_ids >= self.emb_token_id) & (input_ids <= self.emb_token_id + self.num_embs - 1)  # [bs, seq_len]
                 # if have [EMB] tokens
                 if emb_select.sum() != 0:
                     num_patches = emb_select.sum(-1) // self.num_embs 
@@ -805,6 +810,7 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                     # this is for pose class patches
                     max_num_kpt_patches = 100
 
+                    # [bs, max_num_obj/kpt_patches, num_embs, c], [bs, max_num_obj/kpt_patches]
                     obj_querys = torch.zeros((batch_size, max_num_obj_patches, self.num_embs, hidden_size), dtype=hidden_states.dtype, device=hidden_states.device)
                     obj_query_masks = torch.zeros((batch_size, max_num_obj_patches), dtype=torch.bool, device=hidden_states.device)
                     kpt_querys = torch.zeros((batch_size, max_num_kpt_patches, self.num_embs, hidden_size), dtype=hidden_states.dtype, device=hidden_states.device)
@@ -815,9 +821,9 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
                         if num_objcls != 0 and num_kpts != 0:
                             text_query_i = hidden_states[batch_idx, emb_select[batch_idx], :].reshape(-1, self.num_embs, hidden_size)
                             obj_querys[batch_idx, :num_objcls] = text_query_i[:num_objcls, ...] 
-                            obj_query_masks[batch_idx, :num_objcls] = 1           
+                            obj_query_masks[batch_idx, :num_objcls] = 1                
                             kpt_querys[batch_idx, :num_kpts] = text_query_i[num_objcls:, ...]  
-                            kpt_query_masks[batch_idx, :num_kpts] = 1             
+                            kpt_query_masks[batch_idx, :num_kpts] = 1               
 
                     text_query = dict(
                         obj_querys=obj_querys,
@@ -885,3 +891,7 @@ class VisionLLMv2Model(VisionLLMv2PreTrainedModel):
             loss_ip2p=loss_ip2p.detach() if loss_ip2p is not None else None,
             ip2p_outputs=ip2p_outputs,
         )
+
+
+AutoConfig.register("visionllmv2", VisionLLMv2Config)
+AutoModel.register(VisionLLMv2Config, VisionLLMv2Model)
