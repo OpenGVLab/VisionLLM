@@ -155,7 +155,7 @@ data/reasonseg
 
 ### COCO
 
-Follow the instructions below to prepare the data:
+Follow the instructions below to prepare the data (We follow the evaluation from [PSALM](https://github.com/zamling/PSALM)):
 
 ```
 # Step 1: Create the data directory
@@ -165,7 +165,7 @@ mkdir -p data/coco && cd data/coco
 wget http://images.cocodataset.org/zips/train2017.zip && unzip train2017.zip
 wget http://images.cocodataset.org/zips/val2017.zip && unzip val2017.zip
 
-# Step 3: Download and place the annotation files
+# Step 3: Download and place the annotation files from PSALM
 # Download the annotation files from official website https://drive.google.com/file/d/1EcC1tl1OQRgIqqy7KFG7JZz2KHujAQB3/view
 
 cd ../..

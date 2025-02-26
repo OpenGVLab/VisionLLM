@@ -44,7 +44,7 @@ huggingface-cli download --resume-download --local-dir-use-symlinks False senten
 cd ..
 ```
 
-Specify the subset or full set (`lvis`, `paco`) you would like to evaluate in [visionllmv2/eval/eval_region_classification.py](https://github.com/OpenGVLab/VisionLLM/blob/7befe44a38f874fba6835445dbd0177f0b6b46d9/VisionLLMv2/visionllmv2/eval/eval_region_classification.py#L381).
+Specify the datasets (`lvis`, `paco`) you would like to evaluate in [visionllmv2/eval/eval_region_classification.py](https://github.com/OpenGVLab/VisionLLM/blob/7befe44a38f874fba6835445dbd0177f0b6b46d9/VisionLLMv2/visionllmv2/eval/eval_region_classification.py#L381).
 
 ```
 GPUS=8 bash scripts/vllmv2_7b/eval/dist_eval_region_classification.sh work_dirs/VisionLLMv2
