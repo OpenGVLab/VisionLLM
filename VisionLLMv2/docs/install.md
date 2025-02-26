@@ -39,7 +39,7 @@ pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https
 
 Then, please refer to [install.sh](https://github.com/OpenGVLab/VisionLLM/blob/release/VisionLLMv2/install.sh) to install the necessary packages step by step.
 
-- Additional:
+- Additionally:
 
 `pycocoevalcap` is used to evaluate the metrics for image/region captioning. You can install it by yourself.  
 
