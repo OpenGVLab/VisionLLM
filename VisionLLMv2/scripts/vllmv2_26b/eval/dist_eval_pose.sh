@@ -17,8 +17,8 @@ torchrun --nnodes=${NNODES} --nproc_per_node=${GPUS} --master_port=${PORT} \
     --vis_encoder_path ${OUTPUT_DIR} \
     --vl_bridge_type internvl_mlp \
     --vis_output_layer -1 \
-    --use_gdino True \
-    --gdino_path checkpoints/grounding-dino-tiny \
+    --use_unipose True \
+    --unipose_path checkpoints/unipose \
     --freeze_vis_encoder True \
     --freeze_llm False \
     --use_llm_lora False \
@@ -52,4 +52,4 @@ torchrun --nnodes=${NNODES} --nproc_per_node=${GPUS} --master_port=${PORT} \
     --report_to none 
 
 # e.g.
-# bash scripts/vllmv2_26b/eval/dist_eval_det.sh work_dirs/visionllmv2-26b visionllmv2/datasets/configs/det/coco_val.py
+# bash scripts/vllmv2_26b/eval/dist_eval_pose.sh work_dirs/visionllmv2-26b visionllmv2/datasets/configs/pose/unikpt_val.py

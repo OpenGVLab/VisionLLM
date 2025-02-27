@@ -14,7 +14,7 @@ PYTHONPATH="$(dirname $0)/../../..":$PYTHONPATH \
     --image_size 448 \
     --image_max_tile 6 \
     --use_pixelshuffle True \
-    --vis_encoder_path checkpoints/InternViT-6B-448px-V1-5
+    --vis_encoder_path ${OUTPUT_DIR}
 
 
 # e.g.
